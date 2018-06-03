@@ -8,6 +8,7 @@ import json
 import argparse
 from subprocess import call
 import os
+import sys
 
 COLOURS = {"Desc" : "\033[94m",
            "Title" : "\033[93m",
@@ -177,12 +178,17 @@ def download_video(url, filename):
 
     gb_log(COLOURS["Title"], "Downloading " + url + " to " + filename)
     try:
-        call(["wget", "--user-agent", "downloading via giant_bomb_cli",
-              url + "?api_key=" + get_api_key(), "-c", "-O", filename])
+        urlretrieve(url + "?api_key=" + get_api_key(), filename, reporthook=dlProgress)
     except OSError:
         gb_log(COLOURS["Error"],
-               "Something has gone wrong whilst trying to download, is wget installed?")
-
+               "Something has gone wrong whilst trying to download?")
+               
+def dlProgress(count, blockSize, totalSize):
+    percent = int(count*blockSize*100/totalSize)
+    sys.stdout.write("%2d%%" % percent)
+    sys.stdout.write("\b\b\b")
+    sys.stdout.flush()
+    
 def output_response(response, args):
     " Prints details of videos found "
 

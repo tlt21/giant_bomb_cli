@@ -24,7 +24,6 @@ It sets the requested quality to low and then downloads them in descending order
 Usage: giant_bomb_cli.py [options]
 
 Options:
-  --version             show program's version number and exit
   -h, --help            show this help message and exit
   -l <x>, --limit=<x>   limits the amount of items requested, defaults to 25
   --offset=<x>          specify the offest into the results, defaults to 0

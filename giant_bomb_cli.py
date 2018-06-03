@@ -1,6 +1,9 @@
 #! /usr/bin/python
 "  Command line utility for downloading and streaming videos from Giant Bomb!  "
-import urllib2
+from  urllib.error import URLError
+from  urllib.error import HTTPError
+from urllib.request import urlopen
+from urllib.request import urlretrieve
 import json
 import argparse
 from subprocess import call
@@ -28,13 +31,13 @@ CONFIG_LOCATION = os.path.expanduser("~/.giant_bomb_cli")
 
 def gb_log(colour, string):
     " Log a string with a specified colour "
-    print colour + string + COLOURS["End"]
+    print (colour + string + COLOURS["End"])
 
 def file_exists_on_server(url):
     " Make the server request "
     try:
-        urllib2.urlopen(url)
-    except urllib2.URLError:
+        urlopen(url)
+    except URLError:
         return False
 
     return True
@@ -58,7 +61,7 @@ def get_status_code_as_string(status_code):
 
     int_status_code = int(status_code)
 
-    if STATUS_CODES.has_key(int_status_code):
+    if int_status_code in STATUS_CODES:
         return STATUS_CODES[int_status_code]
     else:
         return "Unknown"
@@ -100,10 +103,10 @@ def retrieve_json_from_url(url, json_obj):
     #Make the server request
     response = None
     try:
-        response = urllib2.urlopen(url).read()
-    except urllib2.HTTPError, exception:
+        response = urlopen(url).read()
+    except HTTPError as exception:
         gb_log(COLOURS["Error"], "HTTPError = " + str(exception.code))
-    except urllib2.URLError, exception:
+    except URLError as exception:
         gb_log(COLOURS["Error"], "URLError = " + str(exception.reason))
 
     if response != None:
@@ -228,7 +231,7 @@ def get_api_key():
     if os.path.isfile(config_file_path):
         config_json = json.load(open(config_file_path, "r"))
     else:
-        user_api = raw_input('Please enter your API key: ')
+        user_api = input('Please enter your API key: ')
         config_json["API_KEY"] = user_api.strip()
         json.dump(config_json, open(config_file_path, "w"))
 
@@ -236,7 +239,7 @@ def get_api_key():
 
 def main():
     " Main entry point "
-    parser = argparse.ArgumentParser(version='Giant Bomb Command Line Interface v1.0.0')
+    parser = argparse.ArgumentParser(description='Giant Bomb Command Line Interface v1.0.0')
 
     parser.add_argument('-l', '--limit', dest="limit", action="store", type=int,
                         default=25, metavar="<x>",

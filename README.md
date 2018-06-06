@@ -38,6 +38,7 @@ Options:
   --filter              will attempt to filter by the below arguments
   --sort=SORTORDER      orders the videos by their id (asc/desc) defaults to
                         desc
+  --dump_video_shows    will dump all known ids for video shows,
 
   Filter options:
     Use these in conjunction with --filter to customise results
@@ -47,6 +48,8 @@ Options:
     --id=CONTENTID      id of the video
     --video_type=VIDEOTYPE
                         id of the video type (see --dump_video_types)
+  --video_show_Id=SHOWID
+                        id of the video show (see --dump_video_shows)
 
   Debug Options:
     --debug             logs server requests and json responses

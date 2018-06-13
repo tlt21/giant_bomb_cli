@@ -1,7 +1,7 @@
 #! /usr/bin/python
 "  Command line utility for downloading and streaming videos from Giant Bomb!  "
-from  urllib.error import URLError
-from  urllib.error import HTTPError
+from urllib.error import URLError
+from urllib.error import HTTPError
 from urllib.request import urlopen
 from urllib.request import urlretrieve
 import json
@@ -10,29 +10,119 @@ from subprocess import call
 import os
 import sys
 
-COLOURS = {"Desc" : "\033[94m",
-           "Title" : "\033[93m",
-           "Error" : "\033[31m",
-           "Debug" : "\033[32m",
-           "End" : "\033[0m"}
+
+class EpisodeInfo:
+    def __init__(self, video_name, video_id, publish_date, hd_url, high_url, low_url, downloaded_or_skiped=True):
+        self.downloaded_or_skiped = downloaded_or_skiped
+        self.video_name = video_name
+        self.video_id = video_id
+        self.publish_date = publish_date
+        self.hd_url = hd_url
+        self.high_url = high_url
+        self.low_url = low_url
+
+    def reprJSON(self):
+        return dict(video_name=self.video_name, downloaded_or_skiped=self.downloaded_or_skiped, video_id=self.video_id, publish_date=self.publish_date, hd_url=self.hd_url, high_url=self.high_url, low_url=self.low_url)
+
+
+class ShowInfo:
+    def __init__(self, show_id, episodes, download_folder):
+        self.show_id = show_id
+        self.episodes = []
+        self.download_folder = download_folder
+        for episode in episodes:
+            if not hasattr(episode, "video_id"):
+                self.episodes.append(EpisodeInfo(episode["video_name"], episode["video_id"], episode["publish_date"], episode["hd_url"],
+                                    episode["high_url"], episode["low_url"], episode["downloaded_or_skiped"]))
+            else:
+                self.episodes.append(episode)
+
+    def reprJSON(self):
+        return dict(show_id=self.show_id, episodes=self.episodes, download_folder=self.download_folder)
+
+    def get_latest_date(self):
+        latest_episode_date = "1/1/1800"
+        for episode in self.episodes:
+            if episode.publish_date > latest_episode_date:
+                latest_episode_date = episode.publish_date
+        return latest_episode_date
+
+    def contains_show_id(self, show_id):
+        if self.show_id == show_id:
+            return True
+        else:
+            return False
+
+
+class Show:
+    def __init__(self, show):
+        if not hasattr(show, "show_id"):
+            self.show = ShowInfo(show["show_id"], show["episodes"], show["download_folder"])
+        else:
+            self.show = show
+
+    def reprJSON(self):
+        return dict(show=self.show)
+
+    def contains_show_id(self, show_id):
+        return self.show.contains_show_id(show_id)
+
+    def get_latest_date(self):
+        return self.show.get_latest_date()
+
+
+class Shows:
+    def __init__(self):
+        self.shows = []
+
+    def fromJson(self, j):
+        self.shows = []
+        js = json.loads(j)
+        for show in js["shows"]:
+            self.shows.append(Show(show["show"]))
+        return self
+
+    def reprJSON(self):
+        return dict(shows=self.shows)
+
+    def contains_show_id(self, show_id):
+        for show in self.shows:
+            if show.contains_show_id(show_id):
+                return show
+        return False
+
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, 'reprJSON'):
+            return obj.reprJSON()
+        else:
+            return json.JSONEncoder.default(self, obj)
+
+
+COLOURS = {"Desc": "\033[94m",
+           "Title": "\033[93m",
+           "Error": "\033[31m",
+           "Debug": "\033[32m",
+           "End": "\033[0m"}
 
 VIDEO_QUALITIES = {"low",
                    "high",
-                   "hd",}
+                   "hd", }
 
-STATUS_CODES = {1 : "OK",
-                100 : "Invalid API Key",
-                101 : "Object Not Found",
-                102 : "Error in URL Format",
-                103 : "jsonp' format requires a 'json_callback' argument",
-                104 : "Filter Error",
-                105 : "Subscriber only video is for subscribers only"}
+STATUS_CODES = {1: "OK",
+                100: "Invalid API Key",
+                101: "Object Not Found",
+                102: "Error in URL Format",
+                103: "jsonp' format requires a 'json_callback' argument",
+                104: "Filter Error",
+                105: "Subscriber only video is for subscribers only"}
 
 CONFIG_LOCATION = os.path.expanduser("~/.giant_bomb_cli")
 
 def gb_log(colour, string):
     " Log a string with a specified colour "
-    print (colour + string + COLOURS["End"])
+    print(colour + string + COLOURS["End"])
 
 def file_exists_on_server(url):
     " Make the server request "
@@ -103,7 +193,7 @@ def retrieve_json_from_url(url, json_obj):
         If this function returns true then the json obj passed in has been
         filled with valid data """
 
-    #Make the server request
+    # Make the server request
     response = None
     try:
         response = urlopen(url).read()
@@ -128,7 +218,8 @@ def retrieve_json_from_url(url, json_obj):
 def dump_video_types(api_key):
     " Print out the list of video types "
     gb_log(COLOURS["Title"], "Dumping video type IDs")
-    types_url = "http://www.giantbomb.com/api/video_types/?api_key={0}&format=json".format(api_key)
+    types_url = "http://www.giantbomb.com/api/video_types/?api_key={0}&format=json".format(
+        api_key)
     json_obj = json.loads("{}")
 
     if retrieve_json_from_url(types_url, json_obj) is False:
@@ -143,17 +234,107 @@ def dump_video_types(api_key):
 def dump_video_shows(api_key):
     " Print out the list of video shows "
     gb_log(COLOURS["Title"], "Dumping video show IDs")
-    types_url = "http://www.giantbomb.com/api/video_shows/?api_key={0}&format=json".format(api_key)
+    shows_url = "http://www.giantbomb.com/api/video_shows/?api_key={0}&format=json".format(
+        api_key)
     json_obj = json.loads("{}")
 
-    if retrieve_json_from_url(types_url, json_obj) is False:
-        gb_log(COLOURS["Error"], "Failed to retrieve video types from GB API")
+    if retrieve_json_from_url(shows_url, json_obj) is False:
+        gb_log(COLOURS["Error"], "Failed to retrieve shows from GB API")
         return 1
-
+    shows = Shows()
     for video_show in json_obj["results"]:
+        latest_episode = video_show["latest"][0]
+        show = Show(ShowInfo(str(video_show["id"]), [EpisodeInfo(latest_episode["name"], latest_episode["id"],latest_episode["publish_date"],None,None,None)], None))
+        shows.shows.append(show)
         gb_log(COLOURS["Desc"],
                "\t {0}: {1} - ({2})".format(video_show["id"],
-                                            video_show["title"], video_show["deck"]))
+                                            video_show["title"], video_show["deck"], ))
+
+    return shows
+
+
+def download_subscriptions(api_key,args):
+    # Get Subscriptions Data
+    shows = Shows()
+    try:
+        with open('shows.json') as j:
+            shows = Shows().fromJson(j.read())
+    except:
+        shows = Shows()
+
+    if not len(shows.shows) > 0:
+        gb_log(COLOURS["Error"], "No Shows subscrbed to, see --subscribe_to_show_id")
+        return 1
+
+    currentShows = dump_video_shows(api_key)
+
+    for show in currentShows.shows:
+        v = shows.contains_show_id(show.show.show_id)
+        if v != False:
+            if v.show.get_latest_date() < show.get_latest_date():
+                get_new_episodes(api_key, v)
+                save_show_data(shows)
+            
+            for episode in v.show.episodes:
+                if not episode.downloaded_or_skiped:
+                    prepare_and_download(episode.high_url, episode.video_name, v.show.download_folder)
+                    episode.downloaded_or_skiped = True
+                    save_show_data(shows)
+
+def save_show_data(shows):
+    with open('shows.json', 'w') as outfile:  
+        json.dump(shows.reprJSON(), outfile, cls=ComplexEncoder )
+
+def get_new_episodes(api_key, show:Show):
+    show_data = Show(ShowInfo(show.show.show_id,get_episode_data(api_key, show.show.show_id, False), None))
+    latest_synce_date = show.get_latest_date()
+    
+    for episode in show_data.show.episodes:
+        if episode.publish_date > latest_synce_date:
+            episode.downloaded_or_skiped = False
+            show.show.episodes.append(episode)
+    
+
+def subscribe(api_key, args):
+    if args.outputFolder == None:
+        gb_log(COLOURS["Error"], "Must Specify Output Directory for show")
+        return 1        
+
+    show_id = args.subscribe
+    # Get the subscriptions that we already have
+    try:
+        with open('shows.json') as j:
+            shows = Shows().fromJson(j.read())
+    except:
+        shows = Shows()
+
+    # Check if we already have the show
+    if shows.contains_show_id(show_id) != False:
+        return
+
+    # Get show and episode
+    show = Show(ShowInfo(show_id,get_episode_data(api_key,show_id,skipped=args.dont_skip_old),args.outputFolder ))
+    shows.shows.append(show)
+
+    # Write updated file back to shows list
+    save_show_data(shows)
+
+    
+def get_episode_data(api_key,show_id, offset=0, skipped=True):
+    shows_url = "https://www.giantbomb.com/api/videos/?api_key={0}&filter=video_show:{1}&format=json&sort=publish_date:asc&sort=publish_date:asc&offset={2}".format(api_key,show_id,offset)
+    json_obj = json.loads("{}")
+    
+    if retrieve_json_from_url(shows_url, json_obj) is False:
+        gb_log(COLOURS["Error"], "Failed to retrieve episodes from GB API")
+        return 1
+
+    episodes = []
+    for video_show in json_obj["results"]:
+        episodes.append(EpisodeInfo(video_show["name"], video_show["id"],video_show["publish_date"],video_show["hd_url"],video_show["high_url"],video_show["low_url"] ,skipped))
+
+    if json_obj["number_of_page_results"] == 100:
+        episodes.extend(get_episode_data(api_key,show_id, offset+100, skipped))
+    return episodes
 
 def validate_args(opts):
     " Validate the users arguments "
@@ -226,21 +407,25 @@ def output_response(response, args):
         if args.shouldStream:
             stream_video(url)
         elif args.shouldDownload:
+            prepare_and_download(url,name,args.outputFolder)
+
+    if len(response["results"]) == 0:
+        gb_log(COLOURS["Desc"], "No video results")
+
+
+def prepare_and_download(url, name, outputFolder):
             # Construct filename
             filename = name.replace(" ", "_")
             filename = filename.replace("/", "-")
             filename = filename.replace(":", "")
             filename += "." + url.split(".")[-1]
 
-            if args.outputFolder != None:
-                if not os.path.exists(args.outputFolder):
-                    os.makedirs(args.outputFolder)
-                filename = args.outputFolder + "/" + filename
+    if outputFolder != None:
+        if not os.path.exists(outputFolder):
+            os.makedirs(outputFolder)
+        filename = outputFolder + "/" + filename
 
             download_video(url, filename)
-
-    if len(response["results"]) == 0:
-        gb_log(COLOURS["Desc"], "No video results")
 
 def get_api_key():
     " Get the users api key, either from the cache or via user input"
@@ -299,6 +484,16 @@ def main():
     parser.add_argument('--dump_video_shows', dest="shouldDumpShowIDs", action="store_true",
                         help="will dump all known ids for video shows,", default=False)
 
+    parser.add_argument('--subscribe_to_show_id', dest="subscribe", action="store",
+                        help="will add subscription for show", default=False)
+
+    parser.add_argument('--download_subscriptions', dest="download_subscriptions", action="store_true",
+                            help="will download un-downloaded or un-skiped episodes of subscriptions", default=False)
+
+    parser.add_argument('--dont_skip_old', dest="dont_skip_old", action="store_false", 
+                        help="when adding new subscriptions, specifies whether old episodes should be skipped")
+    
+
     # Filter options
     filter_opts = parser.add_argument_group("Filter options",
                                             "Use these in conjunction with " +
@@ -335,6 +530,15 @@ def main():
     if args.shouldDumpShowIDs:
         dump_video_shows(api_key)
         return 0
+
+    if args.subscribe:
+        subscribe(api_key,args)
+        return 0 
+
+    if args.download_subscriptions:
+        download_subscriptions(api_key,args)
+        return 0 
+
 
     # Create the url and make the request
     request_url = create_request_url(args, api_key) + create_filter_string_from_args(args)

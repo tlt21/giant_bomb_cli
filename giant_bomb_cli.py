@@ -414,18 +414,18 @@ def output_response(response, args):
 
 
 def prepare_and_download(url, name, outputFolder):
-            # Construct filename
-            filename = name.replace(" ", "_")
-            filename = filename.replace("/", "-")
-            filename = filename.replace(":", "")
-            filename += "." + url.split(".")[-1]
+    # Construct filename
+    filename = name.replace(" ", "_")
+    filename = filename.replace("/", "-")
+    filename = filename.replace(":", "")
+    filename += "." + url.split(".")[-1]
 
     if outputFolder != None:
         if not os.path.exists(outputFolder):
             os.makedirs(outputFolder)
         filename = outputFolder + "/" + filename
 
-            download_video(url, filename)
+    download_video(url, filename)
 
 def get_api_key():
     " Get the users api key, either from the cache or via user input"
